@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>DrinkAdvisor — Expert System Chatbot</title>
+  <style>
+    :root{ --bg:#0f1724; --card:#0b1220; --accent:#f59e0b; --muted:#94a3b8; --text:#e6eef8 }
+    body{margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,'Helvetica Neue',Arial;background:linear-gradient(180deg,#071028 0%,#0b1220 100%);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;}
+    .app{width:720px;max-width:98%;background:var(--card);border-radius:12px;box-shadow:0 8px 30px rgba(2,6,23,.6);overflow:hidden;}
+    header{padding:18px 20px;border-bottom:1px solid rgba(255,255,255,.03);display:flex;align-items:center;gap:12px}
+    header h1{margin:0;font-size:18px}
+    .main{padding:18px;display:grid;grid-template-columns:1fr 320px;gap:18px}
+    .chat{background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:12px;min-height:360px;max-height:60vh;overflow:auto;}
+    .msg{max-width:78%;padding:10px 12px;border-radius:12px;line-height:1.3}
+    .user{align-self:flex-end;background:linear-gradient(90deg,#0ea5e9,#2563eb);color:white;border-radius:12px 12px 8px 12px}
+    .bot{align-self:flex-start;background:rgba(255,255,255,0.03);color:var(--text);border-radius:12px 12px 12px 8px}
+    .composer{display:flex;gap:8px;margin-top:6px}
+    .composer input{flex:1;padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:var(--text);outline:none}
+    .composer button{padding:10px 14px;border-radius:10px;border:0;background:var(--accent);color:#06121a;font-weight:600;cursor:pointer}
+    .side{background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent);padding:12px;border-radius:8px;min-height:360px}
+    .hint{font-size:13px;color:var(--muted);margin-bottom:10px}
+    .chips{display:flex;flex-wrap:wrap;gap:8px}
+    .chip{padding:8px 10px;border-radius:999px;background:rgba(255,255,255,0.03);cursor:pointer;border:1px solid rgba(255,255,255,0.02);font-size:13px}
+    .results{margin-top:12px}
+    .drink{padding:8px 10px;border-radius:8px;background:rgba(255,255,255,0.02);margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
+    .explain{margin-top:10px;font-size:13px;color:var(--muted);line-height:1.4}
+    footer{padding:12px 20px;border-top:1px solid rgba(255,255,255,.03);font-size:13px;color:var(--muted)}
+    .small{font-size:12px;color:var(--muted)}
+  </style>
+</head>
+<body>
+  <div class="app" role="application" aria-label="DrinkAdvisor Chatbot">
+    <header>
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <rect width="24" height="24" rx="6" fill="#0ea5e9"></rect>
+        <path d="M7 10c0 3 2 5 5 5s5-2 5-5" stroke="#072033" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M8 7h8" stroke="#072033" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div>
+        <h1>DrinkAdvisor</h1>
+        <div class="small">Type how you feel → get a drink suggestion (type "reset" to clear)</div>
+      </div>
+    </header>
+
+    <div class="main">
+      <div>
+        <div id="chat" class="chat" aria-live="polite"></div>
+
+        <div class="composer" style="margin-top:8px">
+          <input id="input" placeholder="I'm broken-hearted..." aria-label="Type your feelings" />
+          <button id="sendBtn">Recommend</button>
+        </div>
+      </div>
+
+      <aside class="side" aria-label="Controls and suggestions">
+        <div class="hint">Try these quick moods:</div>
+        <div class="chips" id="moodChips"></div>
+
+        <div class="results" id="results">
+          <div class="hint">Top recommendations</div>
+          <!-- dynamic -->
+        </div>
+
+        <div class="explain" id="explain">No input yet. The system matches emotion keywords to drinks and sums points for each drink.</div>
+      </aside>
+    </div>
+
+    <footer>
+      <span class="small">Scoring method • Data-driven rules (no long if/else). You can expand keywords and points in the script.</span>
+    </footer>
+  </div>
+
+<script>
+/*
+  DrinkAdvisor — HTML + JS (scoring-based expert system)
+  - data-driven keyword → drink points mapping
+  - detects keywords in the user's message, sums points per drink
+  - shows top 3 drinks and a chat-like reply
+  - avoids long if/else chains (uses objects, loops, array methods)
+*/
+
+const keywords = {
+  "broken":    {"tequila":2,"whiskey":1},
+  "heart":     {"whiskey":1},
+  "sad":       {"wine":2},
+  "lonely":    {"wine":1, "whiskey":1},
+  "angry":     {"vodka":2},
+  "mad":       {"vodka":2},
+  "stress":    {"rum":1,"whiskey":1},
+  "stressed":  {"rum":1,"whiskey":1},
+  "bored":     {"beer":1,"gin and tonic":1},
+  "boredom":   {"beer":1},
+  "celebrate": {"cocktail":2,"champagne":2},
+  "happy":     {"cocktail":1,"beer":1},
+  "tired":     {"wine":1},
+  "sleep":     {"wine":1},
+  "nervous":   {"cocktail":1,"rum":1},
+  "excited":   {"champagne":2,"cocktail":1},
+  "lonely":    {"wine":1},
+  "confused":  {"cocktail":1}
+};
+
+// All drinks we know about (derived from keywords)
+const drinksSet = Array.from(new Set(Object.values(keywords).flatMap(obj => Object.keys(obj))));
+const defaultDrink = "cocktail";
+
+const chatEl = document.getElementById('chat');
+const inputEl = document.getElementById('input');
+const sendBtn = document.getElementById('sendBtn');
+const resultsEl = document.getElementById('results');
+const explainEl = document.getElementById('explain');
+const moodChipsEl = document.getElementById('moodChips');
+
+const sampleMoods = ["broken-hearted","sad","stressed","angry","bored","celebrating","lonely","nervous","happy","tired"];
+sampleMoods.forEach(m=>{
+  const btn = document.createElement('button');
+  btn.className = 'chip';
+  btn.textContent = m;
+  btn.onclick = ()=>{ inputEl.value = m; runRecommendation(); inputEl.focus(); };
+  moodChipsEl.appendChild(btn);
+});
+
+// Utility: normalize text (lowercase, remove punctuation except hyphen)
+function normalize(text){
+  return text.toLowerCase().replace(/[^\w\s-]/g,' ').replace(/\s+/g,' ').trim();
+}
+
+// Build score vector (no if/else chains)
+function scoreMessage(message){
+  const norm = normalize(message);
+  const words = norm.split(' ').filter(Boolean);
+
+  // initialize scores using drinksSet
+  const scores = drinksSet.reduce((acc, d) => { acc[d]=0; return acc; }, {});
+
+  // For phrase keywords like "broken-hearted", also check, so include joined words and substrings
+  const fullText = ' ' + norm + ' ';
+
+  // iterate over keyword mapping
+  Object.entries(keywords).forEach(([kw, drinkPoints]) => {
+    // detect keyword presence (word boundary or substring for hyphenated)
+    const pattern = new RegExp('\\b' + kw.replace(/[-\/\\^$*+?.()|[\]{}]/g,'\\$&') + '\\b', 'i');
+    if(pattern.test(fullText)){
+      Object.entries(drinkPoints).forEach(([drink, pts]) => {
+        scores[drink] = (scores[drink] || 0) + pts;
+      });
+    }
+  });
+
+  return scores;
+}
+
+// convert scores object to sorted array of {drink,score}
+function topDrinks(scores, topN=3){
+  return Object.entries(scores)
+    .map(([drink,score]) => ({drink,score}))
+    .sort((a,b)=> b.score - a.score || a.drink.localeCompare(b.drink))
+    .slice(0, topN);
+}
+
+// generate a friendly reply text (no long conditionals)
+const friendlyPhrases = [
+  "Sounds like you need:",
+  "I'd suggest:",
+  "How about trying:",
+  "My top pick is:"
+];
+
+function randomChoice(arr){
+  return arr[Math.floor(Math.random()*arr.length)];
+}
+
+function botReplyFor(message){
+  const scores = scoreMessage(message);
+  const tops = topDrinks(scores,3);
+  const maxScore = tops.length ? tops[0].score : 0;
+
+  // If no keyword matched (all zero), recommend default but polite
+  if(maxScore <= 0){
+    return {
+      text: `I couldn't find a clear mood in your message. You could try a ${defaultDrink}, or tell me more about how you feel.`,
+      scores, tops: [{drink:defaultDrink, score:0}]
+    };
+  }
+
+  // Compose reply : friendly phrase + best drink + reasons (top 3)
+  const best = tops[0].drink;
+  const phrase = randomChoice(friendlyPhrases);
+  const reason = `I matched words in your message to my drink profiles. Top choices: ${tops.map(t=>`${t.drink} (${t.score})`).join(', ')}.`;
+
+  return {
+    text: `${phrase} ${best}.`,
+    scores, tops, reason
+  };
+}
+
+// UI helpers
+function appendMessage(text, who='bot'){
+  const node = document.createElement('div');
+  node.className = 'msg ' + (who==='user' ? 'user' : 'bot');
+  node.textContent = text;
+  chatEl.appendChild(node);
+  chatEl.scrollTop = chatEl.scrollHeight;
+}
+
+function showResults(tops, reason){
+  // Clear results area
+  resultsEl.innerHTML = '<div class="hint">Top recommendations</div>';
+  tops.forEach(t=>{
+    const d = document.createElement('div');
+    d.className = 'drink';
+    d.innerHTML = `<div><strong>${t.drink}</strong></div><div class="small">${t.score} pts</div>`;
+    resultsEl.appendChild(d);
+  });
+  explainEl.textContent = reason || 'I scored drinks by matching keywords and adding points. Expand the keywords object to customize behavior.';
+}
+
+function runRecommendation(){
+  const text = inputEl.value.trim();
+  if(!text) return;
+  if(text.toLowerCase() === 'reset'){
+    chatEl.innerHTML = '';
+    resultsEl.innerHTML = '<div class="hint">Top recommendations</div>';
+    explainEl.textContent = 'Reset done. Enter how you feel.';
+    inputEl.value = '';
+    return;
+  }
+
+  appendMessage(text, 'user');
+  const reply = botReplyFor(text);
+  // small simulated typing effect
+  setTimeout(()=> {
+    appendMessage(reply.text, 'bot');
+    showResults(reply.tops, reply.reason);
+  }, 300);
+  inputEl.value = '';
+}
+
+// event listeners
+sendBtn.addEventListener('click', runRecommendation);
+inputEl.addEventListener('keydown', (e)=>{ if(e.key === 'Enter') runRecommendation(); });
+
+// welcome bot message
+appendMessage("Hi — tell me how you're feeling and I'll suggest a drink.", 'bot');
+</script>
+</body>
+</html>
